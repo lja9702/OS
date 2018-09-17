@@ -4,13 +4,15 @@
 #include <interrupt.h>
 #include <device/io.h>
 #include <ssulib.h>
+#include <proc/proc.h>
 
 static Key_Status KStat;
 
-static char kbd_buf[BUFSIZ];
-int buf_head, buf_tail;
+//static char kbd_buf[BUFSIZ];
+//int buf_head, buf_tail;
 //위 전역변수를 사용하는 코드를 cur_foreground_process를 사용하는 코드로 변경
 extern struct process *cur_foreground_process;
+extern struct process *cur_process;	//현재 보고있는 프로세스
 Kbd_buffer kbd_buffer[MAX_KBD_BUFFER];
 
 static BYTE Kbd_Map[4][KBDMAPSIZE] = {
@@ -42,7 +44,7 @@ static BYTE Kbd_Map[4][KBDMAPSIZE] = {
 		0x00, 0x00, '!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '_', '+', '\b', 0x00,
 		'q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p', '{', '}', 0x00, 0x00, 'a', 's',
 		'd', 'f', 'g', 'h', 'j', 'k', 'l', ':', '\"', '~', 0x00, '|', 'z', 'x', 'c', 'v',
-		'b', 'n', 'm', '<', '>', '?', 0x00, 0x00, 0x00, ' ', 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,	
+		'b', 'n', 'm', '<', '>', '?', 0x00, 0x00, 0x00, ' ', 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, '-', 0x00, 0x00, 0x00, '+', 0x00,
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 	}
@@ -58,9 +60,20 @@ void init_kbd(void)
 	KStat.ScrolllockFlag = 0;
 	KStat.ExtentedFlag = 0;
 	KStat.PauseFlag = 0;
+	KStat.CtrlFlag = 0;		//Ctrl+l, Ctrl+Tab @@@@@@@@@@@@
 
-	buf_head = 0;
-	buf_tail = 0;
+	int i;
+
+	for(i = 0;i < MAX_KBD_BUFFER;i++)  //9/17@@for문 전체
+	{
+#ifdef SCREEN_SCROLL
+		kbd_buffer[i].head = 0;
+		kbd_buffer[i].tail = 0;
+		kbd_buffer[i].used = FALSE;
+#endif
+	}
+	//cur_foreground_process->kbd_buffer->head = 0;	//@@@@
+	//cur_foreground_process->kbd_buffer->tail = 0;	//@@@@
 
 	reg_handler(33, kbd_handler);
 }
@@ -69,10 +82,15 @@ void UpdateKeyStat(BYTE Scancode)
 {
 	if(Scancode & 0x80)
 	{
-		if(Scancode == 0xB6 || Scancode == 0xAA)
+		if(Scancode == 0xB6 || Scancode == 0xAA)  //오른쪽 때기 왼쪽 때기
 		{
 			KStat.ShiftFlag = FALSE;
 		}
+		else if(Scancode == 0x9D)		//CTRL BREAK @@@@@@@@@@@
+		{
+			KStat.CtrlFlag = FALSE;
+		}
+
 	}
 	else
 	{
@@ -81,10 +99,16 @@ void UpdateKeyStat(BYTE Scancode)
 			KStat.CapslockFlag = FALSE;
 		}
 		else if(Scancode == 0x3A)
+		{
 			KStat.CapslockFlag = TRUE;
+		}
 		else if(Scancode == 0x36 || Scancode == 0x2A)
 		{
 			KStat.ShiftFlag = TRUE;
+		}
+		else if(Scancode == 0x1D)	//CTRL@@@@@@@@@@@
+		{
+			KStat.CtrlFlag = TRUE;	//@@@@@@@@@
 		}
 	}
 
@@ -108,7 +132,7 @@ BOOL ConvertScancodeToASCII(BYTE Scancode, BYTE *Asciicode)
 
 	if(KStat.ExtentedFlag == TRUE)
 	{
-		if(Scancode & 0x80)	
+		if(Scancode & 0x80)
 			return FALSE;
 		*Asciicode = Scancode;
 		return TRUE;
@@ -152,12 +176,12 @@ BOOL ConvertScancodeToASCII(BYTE Scancode, BYTE *Asciicode)
 
 bool isFull()
 {
-	return (buf_head-1) % BUFSIZ == buf_tail;
+	return ((cur_foreground_process->kbd_buffer->head)-1) % BUFSIZ == cur_foreground_process->kbd_buffer->tail;
 }
 
 bool isEmpty()
 {
-	return buf_head == buf_tail;
+	return cur_process->kbd_buffer->head == cur_process->kbd_buffer->tail;	//@@@@
 }
 
 void kbd_handler(struct intr_frame *iframe)
@@ -167,9 +191,22 @@ void kbd_handler(struct intr_frame *iframe)
 
 	if(ConvertScancodeToASCII(data, &asciicode))
 	{
-
+		if( KStat.CtrlFlag == TRUE)										//@@@@if전체
+		{																							//ctrl을 눌렀을 때
+			switch(asciicode)
+			{
+				case 108: //l @@@@												//ctrl+l일 경우에는
+					//printk("ctrl+l\n");
+					clearScreen();													//콘솔클리어한다.
+					break;
+				case 9:		//tab @@@@											//ctrl+tab일 경우에는
+					//printk("ctrl+tab\n");
+					next_foreground_proc();
+					break;
+			}
+		}
 #ifdef SCREEN_SCROLL
-		if( KStat.ExtentedFlag == TRUE)
+		else if( KStat.ExtentedFlag == TRUE)	//@@@@@@@@@@@
 		{
 			switch(asciicode)
 			{
@@ -196,12 +233,12 @@ void kbd_handler(struct intr_frame *iframe)
 		}
 		else if( !isFull() && asciicode != 0)
 		{
-			kbd_buf[buf_tail] = asciicode;
-			buf_tail = (buf_tail + 1) % BUFSIZ;
+			cur_foreground_process->kbd_buffer->buf[cur_foreground_process->kbd_buffer->tail] = asciicode;
+			cur_foreground_process->kbd_buffer->tail = (cur_foreground_process->kbd_buffer->tail + 1) % BUFSIZ;
 		}
 
 #endif
-		
+
 	}
 	UpdateKeyStat(data);
 }
@@ -212,8 +249,8 @@ char kbd_read_char()
 		return -1;
 
 	char ret;
-	ret = kbd_buf[buf_head];
-	buf_head = (buf_head + 1)%BUFSIZ;
+	ret = cur_process->kbd_buffer->buf[cur_process->kbd_buffer->head];		//@@@@
+	cur_process->kbd_buffer->head = (cur_process->kbd_buffer->head + 1)%BUFSIZ;	//@@@@
 	return ret;
 }
 
@@ -224,6 +261,8 @@ struct Kbd_buffer *get_kbd_buffer(){
 	for(i = 0; i < MAX_KBD_BUFFER; i++){
 		if(kbd_buffer[i].used == false){
 			kbd_buffer[i].used = true;
+			kbd_buffer[i].head = 0;
+			kbd_buffer[i].tail = 0;
 			return &kbd_buffer[i];
 		}
 	}

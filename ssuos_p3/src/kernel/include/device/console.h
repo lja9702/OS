@@ -11,8 +11,8 @@ typedef struct kChStruct
 		unsigned char bAtt;
 } CHAR;
 
-int Glob_x;
-int Glob_y;
+//int Glob_x;
+//int Glob_y;
 
 #pragma pack(pop)
 
@@ -31,23 +31,23 @@ int Glob_y;
 #define LINE_STATUS (IO_BASE + 5)   /* Line Status Register(read-only). */
 #define THR_EMPTY 0x20              /* Transmitter Holding Reg Empty. */
 
-#define buf_e (buf_w + SIZE_NSCROLL)
-#define SCROLL_END buf_s + SIZE_SCROLL
+//#define buf_e (buf_w + SIZE_NSCROLL)
+//#define SCROLL_END buf_s + SIZE_SCROLL
 // Foreground 프로세스마다 입출력 버퍼 할당 시 아래 메크로로 변경
-// #define buf_e (cur_console->buf_w + SIZE_NSCROLL)
-// #define SCROLL_END (cur_console->buf_s + SIZE_SCROLL)
+#define buf_e (cur_console->buf_w + SIZE_NSCROLL)
+#define SCROLL_END (cur_console->buf_s + SIZE_SCROLL)
 
 #define MAX_CONSOLE_NUM 10
 
 typedef struct Console{
-	char buf_s[SIZE_SCROLL]; 
+	char buf_s[SIZE_SCROLL];
 	int Glob_x;
 	int Glob_y;
-	char *buf_w;	
-	char *buf_p;	
+	char *buf_w;
+	char *buf_p;
 	int sum_y;
 	bool a_s;
-	bool used;
+	bool used;	//@할당가능한 콘솔 검색시 사용@@
 }Console;
 
 void init_console(void);

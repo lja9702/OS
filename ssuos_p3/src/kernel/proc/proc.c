@@ -18,7 +18,7 @@
 struct list p_list;		// All Porcess List
 struct list r_list;		// Run Porcess List
 struct list s_list;		// Sleep Process List
-struct list d_list;		// Deleted Process List 
+struct list d_list;		// Deleted Process List
 struct list f_list;		// Foreground Process List
 
 struct process procs[PROC_NUM_MAX];
@@ -37,8 +37,8 @@ bool more_prio(const struct list_elem *a, const struct list_elem *b,void *aux);
 bool less_time_sleep(const struct list_elem *a, const struct list_elem *b,void *aux);
 pid_t getValidPid(int *idx);
 
-void proc_start(void);			
-void proc_end(void);			
+void proc_start(void);
+void proc_end(void);
 
 static void login_prompt(void *);
 static bool check_user(char *, char *);
@@ -61,7 +61,6 @@ void login_prompt(void * aux)
 {
 	char id[BUFSIZ];
 	char password[BUFSIZ];
-
 	while(1)
 	{
 		printk("\nid : ");
@@ -70,8 +69,11 @@ void login_prompt(void * aux)
 		printk("password : ");
 		while(getkbd(password,BUFSIZ) == TRUE);
 
-		if(check_user(id,password))
+		//printk("id:%s  pass:%s\n", id, password);		//@@@@
+
+		if(check_user(id,password)){
 			shell_proc(NULL);
+		}
 		else
 			printk("\nincorrect id or password.\n");
 	}
@@ -84,7 +86,7 @@ bool check_user(char *id, char *password)
 }
 
 
-void init_proc()
+void init_proc()	//@@처음시작시 루트프로세스를 만들어주고 초기화시켜주는 함수
 {
 	process_stack_ofs = offsetof (struct process, stack);
 
@@ -106,11 +108,11 @@ void init_proc()
 	}
 
 	pid_t pid = getValidPid(&i);
-    cur_process = &procs[i];
+  cur_process = &procs[i];	//루트프로세스 생성@@@@@
 
-    cur_process->pid = pid;
-    cur_process->parent = NULL;
-    cur_process->state = PROC_RUN;
+  cur_process->pid = pid;
+  cur_process->parent = NULL;
+  cur_process->state = PROC_RUN;
 	cur_process->priority = 0;
 	cur_process->stack = 0;
 	cur_process->pd = (void*)read_cr3();
@@ -119,6 +121,14 @@ void init_proc()
 	cur_process->elem_stat.prev = NULL;
 	cur_process->elem_stat.next = NULL;
 
+	cur_process->console = cur_console;										//@@@
+	cur_process->kbd_buffer = get_kbd_buffer();						//@@@
+	cur_process->elem_foreground.prev = NULL;							//@@@@
+	cur_process->elem_foreground.next = NULL;							//@@@@
+
+	cur_foreground_process = cur_process;									//현재 foreground 프로세스
+
+	list_push_back(&f_list, &cur_process->elem_foreground);//@@@
 
 	list_push_back(&p_list, &cur_process->elem_all);
 	list_push_back(&r_list, &cur_process->elem_stat);
@@ -129,8 +139,8 @@ pid_t getValidPid(int *idx) {
 	pid_t pid = -1;
 	int i;
 
-	while(lock_pid_simple)
-		;
+	while(lock_pid_simple)	//@@@동시에 여러 프로세스가 요청했을 때
+		;											//@@@PID값이 쳡치지 않게 락을 걸어줌
 
 	lock_pid_simple++;
 
@@ -147,7 +157,7 @@ pid_t getValidPid(int *idx) {
 
 	if(pid != -1)
 	{
-		lately_pid = pid;	
+		lately_pid = pid;
 	}
 
 	lock_pid_simple = 0;
@@ -169,7 +179,7 @@ pid_t proc_create(proc_func func, struct proc_option *opt, void* aux)
 	p->state = PROC_RUN;
 
 	if(opt != NULL)
-		p->priority = opt->priority;   
+		p->priority = opt->priority;
 	else
 		p->priority = (unsigned char)0;
 
@@ -181,7 +191,7 @@ pid_t proc_create(proc_func func, struct proc_option *opt, void* aux)
 	p->pd = pd_create(pid);
 
 	//init stack
-    int *top = (int*)palloc_get_page();
+  int *top = (int*)palloc_get_page();
 	int stack = (int)top;
 	top = (int*)stack + STACK_SIZE - 1;
 
@@ -205,6 +215,7 @@ pid_t proc_create(proc_func func, struct proc_option *opt, void* aux)
 	p->elem_stat.prev = NULL;
 	p->elem_stat.next = NULL;
 
+	cur_process->child_pid = pid;		//@@@@
 
 	//check option, set Console & Kbd
 	//list element, kbd_buffer, console
@@ -213,8 +224,28 @@ pid_t proc_create(proc_func func, struct proc_option *opt, void* aux)
 	list_push_back(&p_list, &p->elem_all);
 	list_push_back(&r_list, &p->elem_stat);
 
+	if(opt == NULL){
+		p->console = get_console();								//@@@
+		p->kbd_buffer = get_kbd_buffer();						//@@@
+		cur_foreground_process = p;
+	}
+	else if(opt != NULL && opt -> foreground == TRUE){ //@@@
+		p->console = get_console();									//@@@
+		p->kbd_buffer = get_kbd_buffer();						//@@@
+		p->elem_foreground.prev = NULL; 						//@@@@
+		p->elem_foreground.next = NULL;							//@@@@
+		list_push_back(&f_list, &p->elem_foreground);//@@@
+		cur_console = p->console;
+		cur_foreground_process = p;									//현재 foreground 프로세스
+	}
+	else if(opt != NULL && opt -> foreground == FALSE){
+		p->console = p->parent->console;						//백그라운드프로세스는 부모의 출력버퍼사용
+	}
+
 	intr_set_level (old_level);
+
 	return p->pid;
+
 }
 
 void* getEIP()
@@ -282,7 +313,7 @@ void proc_sleep(unsigned ticks)
 void proc_block(void)
 {
 	cur_process->state = PROC_BLOCK;
-	schedule();	
+	schedule();
 }
 
 void proc_unblock(struct process* proc)
@@ -295,7 +326,7 @@ void proc_unblock(struct process* proc)
 	proc->state = PROC_RUN;
 
 	intr_set_level(old_level);
-}     
+}
 
 bool less_time_sleep(const struct list_elem *a, const struct list_elem *b,void *aux)
 {
@@ -360,14 +391,15 @@ extern const char* AUTHOR;
 extern const char* MODIFIER;
 void uname_proc(void* aux)
 {
-	printk("SSUOS %s\nmade by %s\nmodefied by %s\n", VERSION, AUTHOR, MODIFIER);	
+	printk("SSUOS %s\nmade by %s\nmodefied by %s\n", VERSION, AUTHOR, MODIFIER);
 
 }
 
 void create_shell_proc(void* aux)
 {
 	struct proc_option proc_opt = {0, TRUE};
-	proc_create(login_prompt,&proc_opt,NULL);
+	int pid = proc_create(login_prompt,&proc_opt,NULL);	//@@@@
+	//printk("@@@@@@@@@@finish proc_create\n");
 }
 
 void print_pid(void* aux) {
@@ -413,15 +445,14 @@ void shell_proc(void* aux)
 		int i, len;
 
 		printk("> ");
-
 		while(getkbd(buf,BUFSIZ))
 		{
-			; 
+			;
 		}
-		
-		for(i=0;buf[i] != '\n'; i++); 
+		for(i=0;buf[i] != '\n'; i++);
 		for(i--; buf[i] == ' '; i--)
 			buf[i] = 0;
+		printk(buf);							//@@@@
 
 		token_num = getToken(buf,token,TOKNUM);
 
@@ -434,7 +465,7 @@ void shell_proc(void* aux)
 				printk("%s\n", cmdlist[i].cmd);
 			continue;
 		}
-		
+
 		for(i = 0; i < CMDNUM; i++)
 		{
 			if( strncmp(cmdlist[i].cmd, token[0], BUFSIZ) == 0)
@@ -452,12 +483,12 @@ void shell_proc(void* aux)
 			void (*func)(void);
 			func = cmdlist[i].func;
 			func();
+			//printk("@@@@@@@@@@out_func\n");
 		}
 		else if(cmdlist[i].type == 1)
 		{
 			cur_process->simple_lock = 1;
 			int pid = fork(cmdlist[i].func, (void*)0x999);
-
 			while(cur_process->simple_lock)
 				;
 		}
@@ -471,12 +502,10 @@ void shell_proc(void* aux)
 
 void idle(void* aux)
 {
-	
-	proc_create(kernel1_proc, NULL, NULL);
-	proc_create(kernel2_proc, NULL, NULL);
+//	proc_create(kernel1_proc, NULL, NULL);
+//	proc_create(kernel2_proc, NULL, NULL);
 	proc_create(login_prompt,NULL,NULL);
-
-	while(1) {  
+	while(1) {
 		if(cur_process->pid != 0) {
 			printk("error : idle process's pid != 0\n", cur_process->pid);
 			while(1);
@@ -490,7 +519,7 @@ void idle(void* aux)
 			list_remove( &p->elem_all);
 		}
 
-		schedule();     
+		schedule();
 	}
 }
 
@@ -503,13 +532,13 @@ void proc_print_data()
 
 	__asm__ __volatile("mov %ebx ,%eax");
 	__asm__ __volatile("mov %%eax ,%0": "=m"(b));
-	
+
 	__asm__ __volatile("mov %ecx ,%eax");
 	__asm__ __volatile("mov %%eax ,%0": "=m"(c));
-	
+
 	__asm__ __volatile("mov %edx ,%eax");
 	__asm__ __volatile("mov %%eax ,%0": "=m"(d));
-	
+
 	//ebp esi edi esp
 	__asm__ __volatile("mov %ebp ,%eax");
 	__asm__ __volatile("mov %%eax ,%0": "=m"(bp));
@@ -593,5 +622,3 @@ void hexDump (void *addr, int len) {
     // And print the final ASCII bit.
     printk ("  %s\n", buff);
 }
-
-

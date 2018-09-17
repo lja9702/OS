@@ -1,8 +1,6 @@
 	.file	"Main.c"
 	.text
 .Ltext0:
-	.comm	Glob_x,4,4
-	.comm	Glob_y,4,4
 	.globl	VERSION
 	.section	.rodata
 .LC0:
@@ -367,19 +365,18 @@ print_contributors:
 .LFE5:
 	.size	print_contributors, .-print_contributors
 .Letext0:
-	.file 2 "./include/device/console.h"
-	.file 3 "./include/syscall.h"
+	.file 2 "./include/syscall.h"
 	.section	.debug_info,"",@progbits
 .Ldebug_info0:
-	.long	0x130
+	.long	0x10e
 	.value	0x4
 	.long	.Ldebug_abbrev0
 	.byte	0x4
 	.uleb128 0x1
-	.long	.LASF23
+	.long	.LASF21
 	.byte	0xc
-	.long	.LASF24
-	.long	.LASF25
+	.long	.LASF22
+	.long	.LASF23
 	.long	.Ltext0
 	.long	.Letext0-.Ltext0
 	.long	.Ldebug_line0
@@ -424,10 +421,10 @@ print_contributors:
 	.byte	0x7
 	.long	.LASF8
 	.uleb128 0x4
-	.long	.LASF26
+	.long	.LASF24
 	.byte	0x4
 	.long	0x33
-	.byte	0x3
+	.byte	0x2
 	.byte	0x4
 	.long	0xa0
 	.uleb128 0x5
@@ -475,46 +472,30 @@ print_contributors:
 	.byte	0x9c
 	.uleb128 0x7
 	.long	.LASF18
-	.byte	0x2
-	.byte	0xe
-	.long	0x4f
-	.uleb128 0x5
-	.byte	0x3
-	.long	Glob_x
-	.uleb128 0x7
-	.long	.LASF19
-	.byte	0x2
-	.byte	0xf
-	.long	0x4f
-	.uleb128 0x5
-	.byte	0x3
-	.long	Glob_y
-	.uleb128 0x7
-	.long	.LASF20
 	.byte	0x1
 	.byte	0x16
-	.long	0x106
+	.long	0xe4
 	.uleb128 0x5
 	.byte	0x3
 	.long	VERSION
 	.uleb128 0x8
 	.byte	0x4
-	.long	0x10c
+	.long	0xea
 	.uleb128 0x9
 	.long	0x2c
 	.uleb128 0x7
-	.long	.LASF21
+	.long	.LASF19
 	.byte	0x1
 	.byte	0x17
-	.long	0x106
+	.long	0xe4
 	.uleb128 0x5
 	.byte	0x3
 	.long	AUTHOR
 	.uleb128 0x7
-	.long	.LASF22
+	.long	.LASF20
 	.byte	0x1
 	.byte	0x18
-	.long	0x106
+	.long	0xe4
 	.uleb128 0x5
 	.byte	0x3
 	.long	MODIFIER
@@ -670,31 +651,27 @@ print_contributors:
 	.string	"ssuos_main"
 .LASF7:
 	.string	"long long unsigned int"
-.LASF19:
-	.string	"Glob_y"
-.LASF24:
+.LASF22:
 	.string	"arch/Main.c"
 .LASF13:
 	.string	"SYS_SHUTDOWN"
+.LASF23:
+	.string	"/home/lja97/ssuos_p3/src/kernel"
 .LASF12:
 	.string	"SYS_SSUREAD"
-.LASF20:
+.LASF18:
 	.string	"VERSION"
 .LASF1:
 	.string	"char"
-.LASF21:
+.LASF19:
 	.string	"AUTHOR"
 .LASF16:
 	.string	"main_init"
-.LASF25:
-	.string	"/home/kym/os/#3_KEYBOARD_INTERRUPT_SOL/src-\352\263\274\354\240\234/kernel"
-.LASF26:
+.LASF24:
 	.string	"SYS_LIST"
-.LASF18:
-	.string	"Glob_x"
 .LASF9:
 	.string	"SYS_FORK"
-.LASF23:
+.LASF21:
 	.string	"GNU C11 5.4.0 20160609 -m32 -mtune=generic -march=i686 -g -O0 -ffreestanding -fno-stack-protector"
 .LASF10:
 	.string	"SYS_EXIT"
@@ -708,7 +685,7 @@ print_contributors:
 	.string	"SYS_WAIT"
 .LASF5:
 	.string	"short int"
-.LASF22:
+.LASF20:
 	.string	"MODIFIER"
 .LASF14:
 	.string	"SYS_NUM"
